@@ -1,0 +1,59 @@
+[project]
+name = "cosyvoice"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10.16"
+dependencies = [
+    "blake3>=1.0.5",
+    "cloudpickle>=3.1.1",
+    "conformer==0.3.2",
+    "diffusers==0.29.0",
+    "fastapi==0.115.6",
+    "fastapi-cli==0.0.4",
+    "gdown==5.1.0",
+    "gguf>=0.17.1",
+    "gradio==5.4.0",
+    "grpcio==1.57.0",
+    "grpcio-tools==1.57.0",
+    "hydra-core==1.3.2",
+    "hyperpyyaml==1.2.2",
+    "inflect==7.3.1",
+    "jupyter>=1.1.1",
+    "librosa==0.10.2",
+    "lightning==2.5.0",
+    "matplotlib==3.7.5",
+    "modelscope==1.20.0",
+    "msgspec>=0.19.0",
+    "networkx==3.1",
+    "omegaconf==2.3.0",
+    "onnx==1.16.0",
+    "onnxruntime==1.22.0",
+    "openai>=1.101.0",
+    "openai-whisper==20240927",
+    "peft>=0.17.1",
+    "prometheus-client>=0.22.1",
+    "protobuf==4.25",
+    "py-cpuinfo>=9.0.0",
+    "pyarrow==18.1.0",
+    "pydantic==2.7.0",
+    "pyworld==0.3.4",
+    "pyzmq>=27.0.2",
+    "rich==13.7.1",
+    "setuptools-scm>=9.2.0",
+    "soundfile==0.12.1",
+    "tensorboard==2.14.0",
+    "torch==2.5.1",
+    "torchaudio==2.5.1",
+    "transformers==4.51.3",
+    "uvicorn==0.30.0",
+    "wetext==0.0.4",
+    "wget==3.2",
+]
+
+[[tool.uv.index]]
+url = "https://mirrors.huaweicloud.com/repository/pypi/simple"
+default = true
+
+[tool.uv.pip]
+index-url = "https://download.pytorch.org/whl/cpu"

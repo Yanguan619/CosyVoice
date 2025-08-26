@@ -11,29 +11,38 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from functools import partial
-from typing import Generator
 import json
-import onnxruntime
-import torch
-import numpy as np
-import whisper
-from typing import Callable
-import torchaudio.compliance.kaldi as kaldi
-import torchaudio
 import os
 import re
+from functools import partial
+from typing import Callable, Generator
+
 import inflect
+import numpy as np
+import onnxruntime
+import torch
+import torchaudio
+import torchaudio.compliance.kaldi as kaldi
+import whisper
+
 try:
     import ttsfrd
     use_ttsfrd = True
 except ImportError:
     print("failed to import ttsfrd, use wetext instead")
-    from wetext import Normalizer as ZhNormalizer
     from wetext import Normalizer as EnNormalizer
+    from wetext import Normalizer as ZhNormalizer
     use_ttsfrd = False
 from cosyvoice.utils.file_utils import logging
-from cosyvoice.utils.frontend_utils import contains_chinese, replace_blank, replace_corner_mark, remove_bracket, spell_out_number, split_paragraph, is_only_punctuation
+from cosyvoice.utils.frontend_utils import (
+    contains_chinese,
+    is_only_punctuation,
+    remove_bracket,
+    replace_blank,
+    replace_corner_mark,
+    spell_out_number,
+    split_paragraph,
+)
 
 
 class CosyVoiceFrontEnd:
@@ -52,11 +61,26 @@ class CosyVoiceFrontEnd:
         option.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
         option.intra_op_num_threads = 1
         self.campplus_session = onnxruntime.InferenceSession(campplus_model, sess_options=option, providers=["CPUExecutionProvider"])
-        self.speech_tokenizer_session = onnxruntime.InferenceSession(speech_tokenizer_model, sess_options=option,
-                                                                     providers=["CUDAExecutionProvider" if torch.cuda.is_available() else
-                                                                                "CPUExecutionProvider"])
+        providers = [
+            # (
+            #     "CANNExecutionProvider",
+            #     {
+            #         "device_id": 0,
+            #         "arena_extend_strategy": "kNextPowerOfTwo",
+            #         "npu_mem_limit": 2 * 1024 * 1024 * 1024,
+            #         "dump_om_model": False,
+            #         "op_select_impl_mode": "high_performance",
+            #         "enable_cann_graph": True,
+            #     },
+            # ),
+            # "CUDAExecutionProvider",
+            "CPUExecutionProvider",
+        ]
+        self.speech_tokenizer_session = onnxruntime.InferenceSession(
+            speech_tokenizer_model, sess_options=option, providers=providers
+        )
         if os.path.exists(spk2info):
-            self.spk2info = torch.load(spk2info, map_location=self.device)
+            self.spk2info = torch.load(spk2info, map_location=self.device, weights_only=False)
         else:
             self.spk2info = {}
         self.allowed_special = allowed_special
@@ -71,6 +95,8 @@ class CosyVoiceFrontEnd:
             self.zh_tn_model = ZhNormalizer(remove_erhua=False)
             self.en_tn_model = EnNormalizer()
             self.inflect_parser = inflect.engine()
+        self.speech_om = None
+        self.flow_om = None
 
     def _extract_text_token(self, text):
         if isinstance(text, Generator):
@@ -92,7 +118,16 @@ class CosyVoiceFrontEnd:
     def _extract_speech_token(self, speech):
         assert speech.shape[1] / 16000 <= 30, 'do not support extract speech token for audio longer than 30s'
         feat = whisper.log_mel_spectrogram(speech, n_mels=128)
-        speech_token = self.speech_tokenizer_session.run(None,
+        if torch.cuda.is_available() and self.speech_om:
+            feed = [feat.detach().cpu().numpy(), np.array([feat.shape[2]], dtype=np.int32)]
+            speech_token = (
+                self.speech_om.infer(feed, mode="dymshape", custom_sizes=[100000000])[0]
+                .flatten()
+                .tolist()
+            )
+            self.flow_om.set_context()
+        else:
+            speech_token = self.speech_tokenizer_session.run(None,
                                                          {self.speech_tokenizer_session.get_inputs()[0].name:
                                                           feat.detach().cpu().numpy(),
                                                           self.speech_tokenizer_session.get_inputs()[1].name:
@@ -151,7 +186,24 @@ class CosyVoiceFrontEnd:
     def frontend_sft(self, tts_text, spk_id):
         tts_text_token, tts_text_token_len = self._extract_text_token(tts_text)
         embedding = self.spk2info[spk_id]['embedding']
-        model_input = {'text': tts_text_token, 'text_len': tts_text_token_len, 'llm_embedding': embedding, 'flow_embedding': embedding}
+        model_input = {
+            'text': tts_text_token,
+            'text_len': tts_text_token_len,
+            'llm_embedding': embedding,
+            'flow_embedding': embedding,
+        }
+
+        return model_input
+
+    def frontend_sft_for_KeyError_Embedding(self, tts_text, spk_id):
+        tts_text_token, tts_text_token_len = self._extract_text_token(tts_text)
+        model_input = {
+            'text': tts_text_token,
+            'text_len': tts_text_token_len,
+            'llm_embedding': self.spk2info[spk_id]['llm_embedding'],
+            'flow_embedding': self.spk2info[spk_id]['flow_embedding'],
+        }
+
         return model_input
 
     def frontend_zero_shot(self, tts_text, prompt_text, prompt_speech_16k, resample_rate, zero_shot_spk_id):

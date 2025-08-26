@@ -23,7 +23,54 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Inference-only Qwen2 model compatible with HuggingFace weights."""
-from vllm.model_executor.models.qwen2 import *
+from collections.abc import Iterable
+from typing import Any, Optional, Union
+
+import torch
+from torch import nn
+from transformers import Qwen2Config
+
+from vllm.vllm.attention import Attention, AttentionType
+from vllm.vllm.compilation.decorators import support_torch_compile
+from vllm.vllm.config import CacheConfig, VllmConfig
+from vllm.vllm.distributed import get_pp_group, get_tensor_model_parallel_world_size
+from vllm.vllm.logger import init_logger
+from vllm.vllm.model_executor.layers.activation import SiluAndMul
+from vllm.vllm.model_executor.layers.layernorm import RMSNorm
+from vllm.vllm.model_executor.layers.linear import (
+    MergedColumnParallelLinear,
+    QKVParallelLinear,
+    RowParallelLinear,
+)
+from vllm.vllm.model_executor.layers.logits_processor import LogitsProcessor
+from vllm.vllm.model_executor.layers.pooler import Pooler, PoolingType
+from vllm.vllm.model_executor.layers.quantization import QuantizationConfig
+from vllm.vllm.model_executor.layers.rotary_embedding import get_rope
+from vllm.vllm.model_executor.layers.vocab_parallel_embedding import (
+    ParallelLMHead,
+    VocabParallelEmbedding,
+)
+from vllm.vllm.model_executor.model_loader.weight_utils import (
+    default_weight_loader,
+    maybe_remap_kv_scale_name,
+)
+from vllm.vllm.model_executor.pooling_metadata import PoolingMetadata
+from vllm.vllm.model_executor.sampling_metadata import SamplingMetadata
+from vllm.vllm.sequence import IntermediateTensors, PoolerOutput
+from vllm.vllm.model_executor.models.qwen2 import Qwen2Model
+from vllm.vllm.model_executor.models.interfaces import SupportsLoRA, SupportsPP
+from vllm.vllm.model_executor.models.utils import (
+    AutoWeightsLoader,
+    PPMissingLayer,
+    WeightsMapper,
+    extract_layer_index,
+    is_pp_missing_parameter,
+    make_empty_intermediate_tensors_factory,
+    make_layers,
+    maybe_prefix,
+)
+
+logger = init_logger(__name__)
 
 
 class CosyVoice2ForCausalLM(nn.Module, SupportsLoRA, SupportsPP):
