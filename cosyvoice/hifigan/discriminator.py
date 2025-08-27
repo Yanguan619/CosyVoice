@@ -1,12 +1,10 @@
+from typing import List, Optional, Tuple
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-try:
-    from torch.nn.utils.parametrizations import weight_norm, spectral_norm
-except ImportError:
-    from torch.nn.utils import weight_norm, spectral_norm
-from typing import List, Optional, Tuple
 from einops import rearrange
+from torch.nn.utils.parametrizations import spectral_norm, weight_norm
 from torchaudio.transforms import Spectrogram
 
 LRELU_SLOPE = 0.1

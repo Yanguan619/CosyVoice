@@ -1,3 +1,33 @@
+![alt text](image-3.png)
+
+```log
+pretrained_models/CosyVoice2-0.5B
+|-- CosyVoice-BlankEN
+|   |-- config.json
+|   |-- generation_config.json
+|   |-- merges.txt
+|   |-- model.safetensors
+|   |-- tokenizer_config.json
+|   `-- vocab.json
+|-- campplus.onnx
+|-- configuration.json
+|-- cosyvoice2.yaml
+|-- flow.cache.pt
+|-- flow.decoder.estimator.fp32.onnx
+|-- flow.encoder.fp16.zip
+|-- flow.encoder.fp32.zip
+|-- flow.pt # 条件流匹配模型
+|-- hift.pt # 文本编码器
+|-- llm.pt # 大语言模型
+|-- speech_tokenizer_v2.onnx # 语音分词器
+|-- spk2info.pt
+|-- spk2info.pt.bak
+`-- vllm
+    |-- config.json
+    |-- generation_config.json
+    `-- model.safetensors
+```
+
 ## 打包
 
 ```bash
